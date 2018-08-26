@@ -1,0 +1,9 @@
+{
+    "name": "tagesschau-crawler",
+    "private": true,
+    "version": "0.0.1",
+    "dependencies": {
+        "mongoose": "^5.0.0",
+        "xml2js": "^0.4.19"
+    }
+}
