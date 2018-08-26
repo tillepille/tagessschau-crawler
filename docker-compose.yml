@@ -1,0 +1,15 @@
+mongo:
+    image: mongo
+    volumes:
+        - mongo-data-vol:/data/db
+mongoview:
+    image: mongo-express
+    ports:
+        - "8081:8081"
+    links:
+        - mongo
+crawler:
+    container_name: ts-crawler
+    build: .
+    links:
+        - mongo

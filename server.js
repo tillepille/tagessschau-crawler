@@ -6,20 +6,16 @@ const https = require('https');
 const config = require("./config.json");
 
 //Prerequisites
-/*
+
 mongoose.connect("mongodb://mongo/ts-articles", function(error) {
     if (error) {
         console.log("while connecting to Mongo DB: " + error);
     }
     console.log("successfully connected to Mongo DB");
+    var myInt = setInterval(mainFunction, config.interval);
+    console.log("System is now running...");
 })
-*/
-
 var lastArticleCached = config.lastArticle;
-var myInt = setInterval(mainFunction, config.interval);
-
-console.log("System is now running...");
-
 function mainFunction() {
     //GET xml feed
     console.log("calling tagesschau XML...");
@@ -30,6 +26,7 @@ function mainFunction() {
         }
         var articleList = result.rss.channel[0].item;
         var newest = new Date(articleList[0].pubDate[0]).getTime();
+        console.log("received list with elements: " + articleList.length);
         for (var i = 0; i < articleList.length; i++) {
             var current = articleList[i];
             var currentDate = new Date(current.pubDate[0]).getTime();
@@ -57,11 +54,11 @@ function saveArticle(item, callback) {
             link: item.link[0],
             content: article
         });
-        /*
+
         newArt.save(function(err) {
             callback(err)
         })
-        */
+
         callback(err);
     });
 }
