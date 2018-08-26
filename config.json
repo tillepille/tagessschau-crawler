@@ -1,5 +1,7 @@
+//Set Configuration, link to RSS, Interval (60s) and some rough marker, where the last article was saved
 {
     "rssLink": "http://www.tagesschau.de/xml/rss2",
     "interval": 60000,
     "lastArticle": 1535046852033
 }
+
