@@ -15,7 +15,7 @@ mongoose.connect("mongodb://mongo/ts-articles", function(error) {
     var myInt = setInterval(mainFunction, config.interval);
     console.log("System is now running...");
 })
-var lastArticleCached = config.lastArticle;
+var lastArticleCached = new Date(config.date).getTime();
 function mainFunction() {
     //GET xml feed
     console.log("calling tagesschau XML...");

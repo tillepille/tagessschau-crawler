@@ -1,15 +1,24 @@
-mongo:
-    image: mongo
-    volumes:
-        - mongo-data-vol:/data/db
-mongoview:
-    image: mongo-express
-    ports:
-        - "8081:8081"
-    links:
-        - mongo
-crawler:
-    container_name: ts-crawler
-    build: .
-    links:
-        - mongo
+version: '3.7'
+services:
+    mongo:
+        image: mongo
+        volumes:
+            - mongo-vol:/data/db
+    mongoview:
+        image: mongo-express
+        ports:
+            - "8081:8081"
+        depends_on:
+            - mongo
+        environment:
+            - ME_CONFIG_BASICAUTH_USERNAME=tagesschau
+            - ME_CONFIG_BASICAUTH_PASSWORD=tagesschau
+    crawler:
+        container_name: ts-crawler
+        build: .
+        init: true
+        depends_on:
+            - mongo
+
+volumes:
+    mongo-vol:
