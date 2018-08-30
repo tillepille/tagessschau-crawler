@@ -16,9 +16,9 @@ mongoose.connect("mongodb://mongo/ts-articles", function(error) {
     console.log("System is now running...");
 })
 var lastArticleCached = new Date(config.date).getTime();
+
 function mainFunction() {
     //GET xml feed
-    console.log("calling tagesschau XML...");
     getContent(config.rssLink, "xml", function(err, result) {
         if (err) {
             console.log(err);
@@ -41,7 +41,6 @@ function mainFunction() {
 }
 
 function saveArticle(item, callback) {
-    console.log("calling tagesschau ARTICLE ...");
     var link = item.link[0].replace("http://", "https://")
     getContent(link, "ssl", function(err, article) {
         if (err) {
@@ -63,8 +62,8 @@ function saveArticle(item, callback) {
     });
 }
 
-function getContent(url, type, callback) {
-    if (type === "ssl") {
+function getContent(url, callback) {
+    if (url.inludes("https://")) {
         var req = https.get(url, function(res) {
             parseContent(res, type, callback);
         });
@@ -73,7 +72,6 @@ function getContent(url, type, callback) {
             parseContent(res, type, callback);
         });
     }
-
 }
 
 function parseContent(res, type, callback) {
