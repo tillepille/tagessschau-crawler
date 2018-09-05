@@ -12,14 +12,15 @@ mongoose.connect("mongodb://mongo/ts-articles", function(error) {
         console.log("while connecting to Mongo DB: " + error);
     }
     console.log("successfully connected to Mongo DB");
+    mainFunction();
     var myInt = setInterval(mainFunction, config.interval);
     console.log("System is now running...");
 })
-var lastArticleCached = new Date(config.date).getTime();
+var lastArticleCached = new Date().getTime();
 
 function mainFunction() {
     //GET xml feed
-    getContent(config.rssLink, "xml", function(err, result) {
+    getContent(config.rssLink, function(err, result) {
         if (err) {
             console.log(err);
             return;
@@ -42,7 +43,7 @@ function mainFunction() {
 
 function saveArticle(item, callback) {
     var link = item.link[0].replace("http://", "https://")
-    getContent(link, "ssl", function(err, article) {
+    getContent(link, function(err, article) {
         if (err) {
             console.log(err);
             callback(err);
@@ -63,13 +64,14 @@ function saveArticle(item, callback) {
 }
 
 function getContent(url, callback) {
-    if (url.inludes("https://")) {
+	var type;
+    if (url.includes("https://")) {
         var req = https.get(url, function(res) {
             parseContent(res, type, callback);
         });
     } else {
         var req = http.get(url, function(res) {
-            parseContent(res, type, callback);
+            parseContent(res, "xml", callback);
         });
     }
 }
@@ -91,7 +93,7 @@ function parseContent(res, type, callback) {
             parseString(respond, function(err, result) {
                 if (err) {
                     console.log(err);
-                    callback(err);
+                    callback(err, null);
                 } else {
                     callback(null, result);
                 }

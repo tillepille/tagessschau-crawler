@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const Article = require('./articleModel');
-const parseString = require('xml2js').parseString;
 const http = require('http');
 const https = require('https');
 
@@ -12,17 +11,18 @@ mongoose.connect("mongodb://mongo/ts-articles", function(error) {
         console.log("while connecting to Mongo DB: " + error);
     }
     console.log("successfully connected to Mongo DB");
+    revision1();
     var myInt = setInterval(revision1, 60000 * 60);
     var myInt2 = setInterval(revision2, 60000 * 60 * 24);
     console.log("System is now running...");
 })
 
 function revision1() {
-    var today = new Date()
-    const todayMinus24h = today.setDate(today.getDate() - 1).getTime();
+    var today = new Date();
+    const todayMinus24h = today.setDate(today.getDate() - 1);
     Article.find({
             publishDate: {
-                $lte: todayMinus24h
+                $lte: todayMinus24h.getTime()
             },
             revision1: {
                 $exists: false
