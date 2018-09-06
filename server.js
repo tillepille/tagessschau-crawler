@@ -4,7 +4,8 @@ const http = require('http');
 const https = require('https');
 const config = require('./config.json');
 const parseString = require('xml2js').parseString;
-//Prerequisites
+
+//  Prerequisites
 var lastArticleCached;
 mongoose.connect("mongodb://mongo/ts-articles", {
     useNewUrlParser: true
@@ -13,15 +14,18 @@ mongoose.connect("mongodb://mongo/ts-articles", {
         console.log("while connecting to Mongo DB: " + error);
     }
     console.log("successfully connected to Mongo DB");
+    //  find last saved article
     Article.find().select('publishDate').sort('-publishDate').limit(1).exec(function(err, result) {
         if (result) {
+            console.log("Last Article is from: " + result.publishDate);
             lastArticleCached = new Date(result.publishDate).getTime();
         } else {
+            //  no Article found e.g. Database empty
             lastArticleCached = 0;
         }
         mainFunction();
     });
-
+    //  set the timers
     var init = setInterval(mainFunction, config.interval);
     var revision1 = setInterval(revision1, config.revision1);
     var revison2 = setInterval(revision2, config.revision2);
@@ -30,7 +34,7 @@ mongoose.connect("mongodb://mongo/ts-articles", {
 })
 
 function mainFunction() {
-    //GET xml feed
+    //  GET xml feed
     getContent(config.rssLink, "xml", function(err, result) {
         if (err) {
             console.log(err);
@@ -101,7 +105,7 @@ function revision2() {
         }).select('publishDate link')
         .exec(doRevision1)
 }
-
+//  actually get the content and save it to DB
 function doRevision1(result, error) {
     result.forEach(getContent(item.link, "ssl", function(err, revisionArticle) {
         item.revision1 = encodeURI(revisionArticle);
@@ -120,8 +124,8 @@ function doRevision2(result, error) {
         });
     }))
 }
-
-function getContent(url,type, callback) {
+//  Just a wrapper for http/https connections
+function getContent(url, type, callback) {
     if (url.includes("https://")) {
         var req = https.get(url, function(res) {
             parseContent(res, type, callback);
@@ -132,7 +136,7 @@ function getContent(url,type, callback) {
         });
     }
 }
-
+//  make the request and parse it if type = xml
 function parseContent(res, type, callback) {
     var respond = '';
     res.on('data', function(chunk) {
