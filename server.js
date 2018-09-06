@@ -1,26 +1,37 @@
 const mongoose = require('mongoose');
 const Article = require('./articleModel');
-const parseString = require('xml2js').parseString;
 const http = require('http');
 const https = require('https');
-const config = require("./config.json");
+
 
 //Prerequisites
-
-mongoose.connect("mongodb://mongo/ts-articles", function(error) {
+var lastArticleCached;
+mongoose.connect("mongodb://mongo/ts-articles", {
+    useNewUrlParser: true
+}, function(error) {
     if (error) {
         console.log("while connecting to Mongo DB: " + error);
     }
     console.log("successfully connected to Mongo DB");
-    mainFunction();
-    var myInt = setInterval(mainFunction, config.interval);
+    Article.find().select('publishDate').sort('-publishDate').limit(1).exec(function(err, result) {
+        if (result) {
+            lastArticleCached = new Date(result.publishDate).getTime();
+        } else {
+            lastArticleCached = 0;
+        }
+        mainFunction();
+    });
+
+    var init = setInterval(mainFunction, config.interval);
+    var revision1 = setInterval(revision1, config.revision1);
+    var revison2 = setInterval(revision2, config.revision2);
+
     console.log("System is now running...");
 })
-var lastArticleCached = new Date().getTime();
 
 function mainFunction() {
     //GET xml feed
-    getContent(config.rssLink, function(err, result) {
+    getContent(config.rssLink, "xml", function(err, result) {
         if (err) {
             console.log(err);
             return;
@@ -42,8 +53,8 @@ function mainFunction() {
 }
 
 function saveArticle(item, callback) {
-    var link = item.link[0].replace("http://", "https://")
-    getContent(link, function(err, article) {
+    var link = item.link[0].replace("http://", "https://");
+    getContent(link, "ssl", function(err, article) {
         if (err) {
             console.log(err);
             callback(err);
@@ -52,7 +63,7 @@ function saveArticle(item, callback) {
             publishDate: new Date(item.pubDate[0]).getTime(),
             title: item.title[0],
             link: item.link[0],
-            content: article
+            content: encodeURI(article)
         });
 
         newArt.save(function(err) {
@@ -63,15 +74,61 @@ function saveArticle(item, callback) {
     });
 }
 
+function revision1() {
+    var today = new Date();
+    const todayMinus24h = today.setDate(today.getDate() - 1).getTime();
+    Article.find({
+            publishDate: {
+                $lte: todayMinus24h.getTime()
+            },
+            revision1: {
+                $exists: false
+            }
+        }).select('publishDate link')
+        .exec(doRevision);
+}
+
+function revision2() {
+    var today = new Date();
+    const todayMinus7d = today.setDate(today.getDate() - 7).getTime();
+    Article.find({
+            publishDate: {
+                $lte: todayMinus7d
+            },
+            revision2: {
+                $exists: false
+            }
+        }).select('publishDate link')
+        .exec(doRevision1)
+}
+
+function doRevision1(result, error) {
+    result.forEach(getContent(item.link, "ssl", function(err, revisionArticle) {
+        item.revision1 = encodeURI(revisionArticle);
+        item.save(function(err, updatedArticle) {
+            console.log("updated Article-rev1: " + item.link);
+        });
+    }))
+}
+
+
+function doRevision2(result, error) {
+    result.forEach(getContent(item.link, "ssl", function(err, revisionArticle) {
+        item.revision2 = encodeURI(revisionArticle);
+        item.save(function(err, updatedArticle) {
+            console.log("updated Article-rev2: " + item.link);
+        });
+    }))
+}
+
 function getContent(url, callback) {
-	var type;
-    if (url.includes("https://")) {
+    if (url.inludes("https://")) {
         var req = https.get(url, function(res) {
             parseContent(res, type, callback);
         });
     } else {
         var req = http.get(url, function(res) {
-            parseContent(res, "xml", callback);
+            parseContent(res, type, callback);
         });
     }
 }
@@ -93,7 +150,7 @@ function parseContent(res, type, callback) {
             parseString(respond, function(err, result) {
                 if (err) {
                     console.log(err);
-                    callback(err, null);
+                    callback(err);
                 } else {
                     callback(null, result);
                 }

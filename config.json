@@ -1,0 +1,6 @@
+{
+    "rssLink"   : "http://www.tagesschau.de/xml/rss2",
+    "interval"  : 60000,
+    "revision1" : 3600000,
+    "revision2" : 86400000
+}
