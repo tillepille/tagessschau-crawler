@@ -18,7 +18,7 @@ services:
             - ME_CONFIG_BASICAUTH_PASSWORD=tagesschau
     crawler:
         container_name: ts-crawler
-        build: ./initCrawl/
+        build: .
         init: true
         restart: on-failure
         depends_on:

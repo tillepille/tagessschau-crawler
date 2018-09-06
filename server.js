@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 const Article = require('./articleModel');
 const http = require('http');
 const https = require('https');
-
-
+const config = require('./config.json');
+const parseString = require('xml2js').parseString;
 //Prerequisites
 var lastArticleCached;
 mongoose.connect("mongodb://mongo/ts-articles", {
@@ -121,8 +121,8 @@ function doRevision2(result, error) {
     }))
 }
 
-function getContent(url, callback) {
-    if (url.inludes("https://")) {
+function getContent(url,type, callback) {
+    if (url.includes("https://")) {
         var req = https.get(url, function(res) {
             parseContent(res, type, callback);
         });
