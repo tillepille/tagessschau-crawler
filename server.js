@@ -91,19 +91,18 @@ function saveArticle(item, callback) {
 
 function revision1() {
     var today = new Date();
-    const todayMinus24h = today.setDate(today.getDate() - 1).getTime();
+    const todayMinus24h = new Date().setDate(today.getDate() - 1);
     Article.find({
             publishDate: {
-                $lte: todayMinus24h.getTime()
-            },
-            'revisions.1': ""
+                $lte: todayMinus24h
+            }
         }).select('publishDate link')
         .exec(doRevision);
 }
 
 function revision2() {
     var today = new Date();
-    const todayMinus7d = today.setDate(today.getDate() - 7).getTime();
+    const todayMinus7d = today.setDate(today.getDate() - 7);
     Article.find({
             publishDate: {
                 $lte: todayMinus7d
@@ -113,13 +112,16 @@ function revision2() {
         .exec(doRevision)
 }
 //  actually get the content and save it to DB
-function doRevision(result, error) {
-    result.forEach(getContent(item.link, "ssl", function(revisionArticle) {
-        item.revisions.push(encodeURI(revisionArticle));
-        item.save(function(err, updatedArticle) {
-            console.log("updated Article-rev1: " + item.link);
-        });
-    }))
+function doRevision(error, result) {
+    console.log(JSON.stringify(result));
+    result.forEach(function (item){
+        getContent(item.link, "ssl", function(error, revisionArticle) {
+            item.revisions.push(encodeURI(revisionArticle));
+            item.save(function(err, updatedArticle) {
+                 console.log("updated Article-rev1: " + item.link);
+            });
+        })
+   })
 }
 //  Just a wrapper for http/https connections
 function getContent(url, type, callback) {
