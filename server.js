@@ -24,7 +24,13 @@ mongoose.connect("mongodb://mongo/ts-articles", {
             //  no Article found e.g. Database empty
             lastArticleCached = 0;
         }
+        //   let all functions run once
+        console.log("initial crawling...");
         mainFunction();
+        console.log("revision1 crawling...");
+        revision1();
+        console.log("revision2 crawling...");
+        revision2();
     });
     //  set the timers
     var initcrawl = setInterval(mainFunction, config.interval);
@@ -49,7 +55,6 @@ function mainFunction() {
         console.log("received list with elements: " + articleList.length);
         getLatestArticle(function(err, lastArticle) {
             articleList.forEach(function(current) {
-                console.log("current : "+current);
                 var currentDate = new Date(current.pubDate[0]);
                 if (lastArticle.publishDate < currentDate) {
                     saveArticle(current, function(err) {
