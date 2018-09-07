@@ -15,7 +15,7 @@ mongoose.connect("mongodb://mongo/ts-articles", {
     }
     console.log("successfully connected to Mongo DB");
     //  find last saved article
-    Article.find().select('publishDate').sort('-publishDate').limit(1).exec(function(err, result) {
+    Article.findOne().select('publishDate').sort('-publishDate').limit(1).exec(function(err, result) {
         if (result) {
             console.log("Last Article is from: " + result.publishDate);
             lastArticleCached = new Date(result.publishDate).getTime();
@@ -26,7 +26,7 @@ mongoose.connect("mongodb://mongo/ts-articles", {
         mainFunction();
     });
     //  set the timers
-    var init = setInterval(mainFunction, config.interval);
+    var initcrawl = setInterval(mainFunction, config.interval);
     var revision1 = setInterval(revision1, config.revision1);
     var revison2 = setInterval(revision2, config.revision2);
 
