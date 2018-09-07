@@ -12,10 +12,11 @@ mongoose.connect("mongodb://mongo/ts-articles", {
 }, function(error) {
     if (error) {
         console.log("while connecting to Mongo DB: " + error);
+        return 1;
     }
     console.log("successfully connected to Mongo DB");
     //  find last saved article
-    Article.findOne().select('publishDate').sort('-publishDate').limit(1).exec(function(err, result) {
+    getLatestArticle(function(err, result) {
         if (result) {
             console.log("Last Article is from: " + result.publishDate);
             lastArticleCached = new Date(result.publishDate).getTime();
@@ -27,11 +28,15 @@ mongoose.connect("mongodb://mongo/ts-articles", {
     });
     //  set the timers
     var initcrawl = setInterval(mainFunction, config.interval);
-    var revision1 = setInterval(revision1, config.revision1);
-    var revison2 = setInterval(revision2, config.revision2);
+    var revision1Promise = setInterval(revision1, config.revision1);
+    var revison2Promise = setInterval(revision2, config.revision2);
 
     console.log("System is now running...");
-})
+});
+
+function getLatestArticle(callback) {
+    Article.findOne().select('publishDate').sort('-publishDate').limit(1).exec(callback);
+}
 
 function mainFunction() {
     //  GET xml feed
@@ -41,19 +46,19 @@ function mainFunction() {
             return;
         }
         var articleList = result.rss.channel[0].item;
-        var newest = new Date(articleList[0].pubDate[0]).getTime();
         console.log("received list with elements: " + articleList.length);
-        for (var i = 0; i < articleList.length; i++) {
-            var current = articleList[i];
-            var currentDate = new Date(current.pubDate[0]).getTime();
-            if (lastArticleCached < currentDate) {
-                saveArticle(current, function(err) {
-                    console.log("Saved new Article");
-                })
-            }
-        }
-        lastArticleCached = newest;
-    })
+        getLatestArticle(function(err, lastArticle) {
+            articleList.forEach(function(current) {
+                console.log("current : "+current);
+                var currentDate = new Date(current.pubDate[0]);
+                if (lastArticle.publishDate < currentDate) {
+                    saveArticle(current, function(err) {
+                        console.log("Saved new Article");
+                    })
+                }
+            });
+        });
+    });
 }
 
 function saveArticle(item, callback) {
@@ -67,7 +72,8 @@ function saveArticle(item, callback) {
             publishDate: new Date(item.pubDate[0]).getTime(),
             title: item.title[0],
             link: item.link[0],
-            content: encodeURI(article)
+            content: encodeURI(article),
+            revisions: []
         });
 
         newArt.save(function(err) {
@@ -85,9 +91,7 @@ function revision1() {
             publishDate: {
                 $lte: todayMinus24h.getTime()
             },
-            revision1: {
-                $exists: false
-            }
+            'revisions.1': ""
         }).select('publishDate link')
         .exec(doRevision);
 }
@@ -99,28 +103,16 @@ function revision2() {
             publishDate: {
                 $lte: todayMinus7d
             },
-            revision2: {
-                $exists: false
-            }
+            'revisions.2': ""
         }).select('publishDate link')
-        .exec(doRevision1)
+        .exec(doRevision)
 }
 //  actually get the content and save it to DB
-function doRevision1(result, error) {
-    result.forEach(getContent(item.link, "ssl", function(err, revisionArticle) {
-        item.revision1 = encodeURI(revisionArticle);
+function doRevision(result, error) {
+    result.forEach(getContent(item.link, "ssl", function(revisionArticle) {
+        item.revisions.push(encodeURI(revisionArticle));
         item.save(function(err, updatedArticle) {
             console.log("updated Article-rev1: " + item.link);
-        });
-    }))
-}
-
-
-function doRevision2(result, error) {
-    result.forEach(getContent(item.link, "ssl", function(err, revisionArticle) {
-        item.revision2 = encodeURI(revisionArticle);
-        item.save(function(err, updatedArticle) {
-            console.log("updated Article-rev2: " + item.link);
         });
     }))
 }
