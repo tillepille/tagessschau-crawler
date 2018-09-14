@@ -52,7 +52,7 @@ function mainFunction() {
             return;
         }
         var articleList = result.rss.channel[0].item;
-        console.log("received list with elements: " + articleList.length);
+        console.log("received XML List");
         getLatestArticle(function(err, lastArticle) {
             articleList.forEach(function(current) {
                 var currentDate = new Date(current.pubDate[0]);
@@ -78,7 +78,8 @@ function saveArticle(item, callback) {
             title: item.title[0],
             link: item.link[0],
             content: encodeURI(article),
-            revisions: []
+            revision1: "nothing",
+	    revision2: "nothing"
         });
 
         newArt.save(function(err) {
@@ -95,8 +96,9 @@ function revision1() {
     Article.find({
             publishDate: {
                 $lte: todayMinus24h
-            }
-        }).select('publishDate link')
+            },
+	    'revision1': "nothing"
+        }).select('publishDate link revision1 revision2')
         .exec(doRevision);
 }
 
@@ -107,16 +109,22 @@ function revision2() {
             publishDate: {
                 $lte: todayMinus7d
             },
-            'revisions.2': ""
-        }).select('publishDate link')
+            'revision2': "nothing"
+        }).select('publishDate link revision1 revision2')
         .exec(doRevision)
 }
 //  actually get the content and save it to DB
 function doRevision(error, result) {
-    console.log(JSON.stringify(result));
+    console.log("received " + result.length + " items to update");
     result.forEach(function (item){
         getContent(item.link, "ssl", function(error, revisionArticle) {
-            item.revisions.push(encodeURI(revisionArticle));
+        if (item.revision1 === "nothing"){
+		item.revision1 = encodeURI(revisionArticle);
+	}else if (item.revision2 === "nothing") {
+		item.revision2 = encodeURI(revisionArticle);
+	}else{
+		console.log("Error with this item: "+ JSON.stringify(item));
+	}
             item.save(function(err, updatedArticle) {
                  console.log("updated Article-rev1: " + item.link);
             });
@@ -142,7 +150,7 @@ function parseContent(res, type, callback) {
         respond += chunk;
     });
     res.on('error', function(e) {
-
+	console.log("Error in Connection: " + e);
         callback(e, null);
     });
     res.on('timeout', function(e) {
