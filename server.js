@@ -6,14 +6,19 @@ const config = require('./config.json')
 const parseString = require('xml2js').parseString
 
 //  Prerequisites
+try{
+const db = await mongoose.connect('mongodb://mongo/ts-articles')
+}catch(error){
+	console.log('while connecting to Mongo DB: ' + error)
+	return 1
+}
 
-mongoose.connect('mongodb://mongo/ts-articles')
 mongoose.connect('mongodb://mongo/ts-articles', {
 	useNewUrlParser: true
 }, (error) => {
 	if (error) {
-		console.log('while connecting to Mongo DB: ' + error)
-		return 1
+	console.log('while connecting to Mongo DB: ' + error)
+		return 10	
 	}
 	console.log('successfully connected to Mongo DB')
 	//   let all functions run once
@@ -21,16 +26,16 @@ mongoose.connect('mongodb://mongo/ts-articles', {
 	mainFunction()
 	//Wait to have Articles in Database
 	setTimeout(() => {
-		revision1()
+		findForRevision(1,'revision1')
 	}, 10000)
 	setTimeout(() => {
-		revision2()
+		revision(7, 'revision2')
 	}, 20000)
 })
 //  set the timers
 setInterval(mainFunction, config.interval)
-setInterval(revision1, config.revision1)
-setInterval(revision2, config.revision2)
+setInterval(findForRevision(1, 'revision1'), config.revision1)
+setInterval(findForRevision(7,'revision2'), config.revision2)
 
 console.log('System is now running...')
 
@@ -66,52 +71,42 @@ async function mainFunction() {
 }
 
 async function saveArticle(item, callback) {
-	var link = item.link[0].replace('http://', 'https://')
-	getContent(link, (err, article) => {
-		if (err) {
-			console.log(err)
-			throw (err)
-		}
-		var newArt = new Article({
-			publishDate: new Date(item.pubDate[0]).getTime(),
-			title: item.title[0],
-			link: link,
-			content: encodeURI(article),
-			revision1: 'nothing',
-			revision2: 'nothing'
-		})
-		return newArt.save()
+	try{
+		let link = item.link[0].replace('http://', 'https://')
+		const article = await getContent(link)
+	} catch (error){
+		console.error(error)
+		throw error
+	}
+	var newArt = new Article({
+		publishDate: new Date(item.pubDate[0]).getTime(),
+		title: item.title[0],
+		link: link,
+		content: encodeURI(article),
+		revision1: 'nothing',
+		revision2: 'nothing'
 	})
+	return newArt.save()	
 }
 
-function revision1() {
+function findForRevision(delay, wichRevision) {
 	var today = new Date()
-	const todayMinus24h = new Date().setDate(today.getDate() - 1)
-	return Article.find({
+	const todayMinusDelay = new Date().setDate(today.getDate() - delay)
+	const toRevision = await Article.find({
 			publishDate: {
-				$lte: todayMinus24h
-			},
-			'revision1': 'nothing'
+				$lte: todayMinusdelay
+				},
+			wichRevision : 'nothing'
 		}).select('publishDate link revision1 revision2')
-		.exec(doRevision)
+		.exec()
+	return doRevision(toRevision)
 }
 
-function revision2() {
-	var today = new Date()
-	const todayMinus7d = today.setDate(today.getDate() - 7)
-	return Article.find({
-			publishDate: {
-				$lte: todayMinus7d
-			},
-			'revision2': 'nothing'
-		}).select('publishDate link revision1 revision2')
-		.exec(doRevision)
-}
 //  actually get the content and save it to DB
 async function doRevision(error, result) {
 	console.log('received ' + result.length + ' items to update')
 	return new Promise((resolve, reject) => {
-		result.forEach(async (item) => {
+		const newArticles = result.map(async (item) => {
 			const revisionArticle = await getContent(item.link)
 			if (item.revision1 === 'nothing') {
 				item.revision1 = encodeURI(revisionArticle)
@@ -123,6 +118,7 @@ async function doRevision(error, result) {
 			}
 			return item.save()
 		})
+		return await Promise.all(newArticles)
 	})
 }
 //  Just a wrapper for http/https connections
