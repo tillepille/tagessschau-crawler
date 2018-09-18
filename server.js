@@ -6,108 +6,109 @@ const config = require('./config.json')
 const parseString = require('xml2js').parseString
 
 //  Prerequisites
-try{
-const db = await mongoose.connect('mongodb://mongo/ts-articles')
-}catch(error){
-	console.log('while connecting to Mongo DB: ' + error)
-	return 1
+async function init() {
+	try {
+		const db = await mongoose.connect('mongodb://mongo/ts-articles', {
+			useNewUrlParser: true
+		})
+		mainFunction()
+		//Wait to have Articles in Database
+		setTimeout(() => {
+			findForRevision(1, 'revision1')
+		}, 10000)
+		setTimeout(() => {
+			findForRevision(7, 'revision2')
+		}, 20000)
+
+		//  set the timers
+		setInterval(() => mainFunction(), config.interval)
+		setInterval(() => findForRevision(1, 'revision1'), config.revision1)
+		setInterval(() => findForRevision(7, 'revision2'), config.revision2)
+	} catch (error) {
+		console.log('while connecting to Mongo DB: ' + error)
+		return 1
+	}
+
+	console.log('System is now running...')
 }
 
-mongoose.connect('mongodb://mongo/ts-articles', {
-	useNewUrlParser: true
-}, (error) => {
-	if (error) {
-	console.log('while connecting to Mongo DB: ' + error)
-		return 10	
-	}
-	console.log('successfully connected to Mongo DB')
-	//   let all functions run once
-	console.log('initial crawling...')
-	mainFunction()
-	//Wait to have Articles in Database
-	setTimeout(() => {
-		findForRevision(1,'revision1')
-	}, 10000)
-	setTimeout(() => {
-		revision(7, 'revision2')
-	}, 20000)
-})
-//  set the timers
-setInterval(mainFunction, config.interval)
-setInterval(findForRevision(1, 'revision1'), config.revision1)
-setInterval(findForRevision(7,'revision2'), config.revision2)
 
-console.log('System is now running...')
-
-function getLatestArticle(callback) {
-	Article.findOne().select('publishDate').sort('-publishDate').limit(1).exec(callback)
+function getLatestArticle() {
+	return Article.findOne().select('publishDate').sort('-publishDate').limit(1).exec()
 }
 
 async function mainFunction() {
-	//  GET xml feed
 	try {
-		const respond = await getContent(config.rssLink)
-		const result = await parseString(respond)
+		const respond = await fetchContent(config.rssLink)
+		const result = await parseXML(respond)
 		const lastArticle = await getLatestArticle()
 		const articleList = result.rss.channel[0].item
-	} catch (error) {
-		console.log(error);
-		return
-	}
-	console.log('received XML List')
-	//  Check the case there is no last Article in DB
-	let lastArticleDate
-	if (!lastArticle) {
-		lastArticleDate = 0
-	} else {
-		lastArticleDate = lastArticle.publishDate
-	}
-	articleList.forEach(async (current) => {
-		const currentDate = new Date(current.pubDate[0])
-		if (lastArticleDate < currentDate) {
-			const done = await saveArticle(current)
+		console.log('received XML List')
+		//  Check the case there is no last Article in DB
+		let lastArticleDate
+		if (!lastArticle) {
+			lastArticleDate = 0
+		} else {
+			lastArticleDate = lastArticle.publishDate
 		}
-	})
-}
-
-async function saveArticle(item, callback) {
-	try{
-		let link = item.link[0].replace('http://', 'https://')
-		const article = await getContent(link)
-	} catch (error){
-		console.error(error)
-		throw error
+		articleList.forEach(async (current) => {
+			const currentDate = new Date(current.pubDate[0])
+			if (lastArticleDate < currentDate) {
+				const done = await saveArticle(current)
+			}
+		})
+	} catch (error) {
+		console.log(error)
+		return 1
 	}
-	var newArt = new Article({
-		publishDate: new Date(item.pubDate[0]).getTime(),
-		title: item.title[0],
-		link: link,
-		content: encodeURI(article),
-		revision1: 'nothing',
-		revision2: 'nothing'
-	})
-	return newArt.save()	
 }
 
-function findForRevision(delay, wichRevision) {
-	var today = new Date()
+async function saveArticle(item) {
+	var link = item.link[0].replace('http://', 'https://')
+	try {
+		const article = await fetchContent(link)
+    const encodedArticle = encodeURI(article)
+    const newArt = new Article({
+  		publishDate: new Date(item.pubDate[0]).getTime(),
+  		title: item.title[0],
+  		link: link,
+  		content: encodedArticle,
+  		revision1: 'nothing',
+  		revision2: 'nothing'
+  	})
+  	return newArt.save()
+
+  } catch (error) {
+		console.error('Error while getting the content of an item ' + error)
+    return error
+	}
+
+}
+
+async function findForRevision(delay, wichRevision) {
+	const today = new Date()
 	const todayMinusDelay = new Date().setDate(today.getDate() - delay)
-	const toRevision = await Article.find({
-			publishDate: {
-				$lte: todayMinusdelay
+	try {
+		const toRevision = await Article.find({
+				publishDate: {
+					$lte: todayMinusDelay
 				},
-			wichRevision : 'nothing'
-		}).select('publishDate link revision1 revision2')
-		.exec()
-	return doRevision(toRevision)
+				wichRevision: 'nothing'
+			}).select('publishDate link revision1 revision2')
+			.exec()
+		const revisionedArticles = await doRevision(toRevision)
+	} catch (error) {
+		console.log(error)
+	}
+
 }
 
 //  actually get the content and save it to DB
-async function doRevision(error, result) {
+async function doRevision(result) {
 	console.log('received ' + result.length + ' items to update')
 	return new Promise((resolve, reject) => {
 		const newArticles = result.map(async (item) => {
-			const revisionArticle = await getContent(item.link)
+			const revisionArticle = await fetchContent(item.link)
 			if (item.revision1 === 'nothing') {
 				item.revision1 = encodeURI(revisionArticle)
 			} else if (item.revision2 === 'nothing') {
@@ -118,21 +119,21 @@ async function doRevision(error, result) {
 			}
 			return item.save()
 		})
-		return await Promise.all(newArticles)
+		return Promise.all(newArticles)
 	})
 }
 //  Just a wrapper for http/https connections
-async function getContent(url, callback) {
+async function fetchContent(url) {
 	if (url.includes('https://')) {
-    const res = await https.get(url)
-    return parseContent(res)
+		const res = await promiseHTTPS(url)
+		return parseContent(res)
 	} else {
-    const res = await http.get(url)
-    return parseContent(res)
+		const res = await promiseHTTP(url)
+		return parseContent(res)
 	}
 }
 //  make the request
-async function parseContent(res, callback) {
+function parseContent(res) {
 	return new Promise((resolve, reject) => {
 		let respond = ''
 		res.on('data', chunk => respond += chunk)
@@ -141,3 +142,33 @@ async function parseContent(res, callback) {
 		res.on('end', () => resolve(respond))
 	})
 }
+
+function parseXML(raw) {
+	return new Promise((resolve, reject) => {
+		parseString(raw, (error, xml) => {
+			if (error) {
+				reject(error)
+			} else {
+				resolve(xml)
+			}
+		})
+	})
+}
+
+function promiseHTTP(url) {
+	return new Promise((resolve, reject) => {
+		http.get(url, res => {
+			resolve(res)
+		})
+	})
+}
+
+function promiseHTTPS(url) {
+	return new Promise((resolve, reject) => {
+		https.get(url, res => {
+			resolve(res)
+		})
+	})
+}
+
+init()
