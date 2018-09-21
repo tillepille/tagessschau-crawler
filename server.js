@@ -22,8 +22,8 @@ async function init() {
 
 		//  set the timers
 		setInterval(() => mainFunction(), config.interval)
-		setInterval(() => findForRevision(1, 'revision1'), config.revision1)
-		setInterval(() => findForRevision(7, 'revision2'), config.revision2)
+		setInterval(() => findForRevision(6, 'revision1'), config.revision1)
+		setInterval(() => findForRevision(48, 'revision2'), config.revision2)
 	} catch (error) {
 		console.log('while connecting to Mongo DB: ' + error)
 		return 1
@@ -67,34 +67,32 @@ async function saveArticle(item) {
 	var link = item.link[0].replace('http://', 'https://')
 	try {
 		const article = await fetchContent(link)
-    const encodedArticle = encodeURI(article)
-    const newArt = new Article({
-  		publishDate: new Date(item.pubDate[0]).getTime(),
-  		title: item.title[0],
-  		link: link,
-  		content: encodedArticle,
-  		revision1: 'nothing',
-  		revision2: 'nothing'
-  	})
-  	return newArt.save()
+		const encodedArticle = encodeURI(article)
+		const newArt = new Article({
+			publishDate: new Date(item.pubDate[0]).getTime(),
+			title: item.title[0],
+			link: link,
+			content: encodedArticle,
+			revision1: 'nothing',
+			revision2: 'nothing'
+		})
+		return newArt.save()
 
-  } catch (error) {
+	} catch (error) {
 		console.error('Error while getting the content of an item ' + error)
-    return error
+		return error
 	}
 
 }
 
 async function findForRevision(delay, wichRevision) {
 	const today = new Date()
-	const todayMinusDelay = new Date().setDate(today.getDate() - delay)
+	const todayMinusDelay = new Date().setHours(today.getHours() - delay)
 	try {
-		const toRevision = await Article.find({
-				publishDate: {
-					$lte: todayMinusDelay
-				},
-				wichRevision: 'nothing'
-			}).select('publishDate link revision1 revision2')
+		const toRevision = await Article.find()
+			.where('publishDate').lte(todayMinusDelay)
+			.where(wichRevision).eq('nothing')
+			.select('publishDate link revision1 revision2')
 			.exec()
 		const revisionedArticles = await doRevision(toRevision)
 	} catch (error) {
