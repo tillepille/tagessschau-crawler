@@ -14,10 +14,10 @@ async function init() {
 		mainFunction()
 		//Wait to have Articles in Database
 		setTimeout(() => {
-			findForRevision(1, 'revision1')
+			findForRevision(6, 'revision1')
 		}, 10000)
 		setTimeout(() => {
-			findForRevision(7, 'revision2')
+			findForRevision(48, 'revision2')
 		}, 20000)
 
 		//  set the timers
