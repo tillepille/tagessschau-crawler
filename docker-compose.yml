@@ -14,12 +14,13 @@ services:
         depends_on:
             - mongo
         environment:
-            - ME_CONFIG_BASICAUTH_USERNAME=tagesschau
+            - ME_CONFIG_BASICAUTH_USERNAME=admin
             - ME_CONFIG_BASICAUTH_PASSWORD=tagesschau
     crawler:
         container_name: ts-crawler
         build: .
         init: true
+	restart: on-failure
         depends_on:
             - mongo
 volumes:
