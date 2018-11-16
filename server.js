@@ -14,10 +14,10 @@ async function init() {
 		mainFunction()
 		//Wait to have Articles in Database
 		setTimeout(() => {
-			findForRevision(1, 'revision1')
+			findForRevision(6, 'revision1')
 		}, 10000)
 		setTimeout(() => {
-			findForRevision(7, 'revision2')
+			findForRevision(48, 'revision2')
 		}, 20000)
 
 		//  set the timers
@@ -66,7 +66,8 @@ async function mainFunction() {
 async function saveArticle(item) {
 	var link = item.link[0].replace('http://', 'https://')
 	try {
-		const article = await fetchContent(link)
+		let article = await fetchContent(link)
+    article = article.replace(/"/g, "'")
 		const encodedArticle = encodeURI(article)
 		const newArt = new Article({
 			publishDate: new Date(item.pubDate[0]).getTime(),
