@@ -66,7 +66,8 @@ async function mainFunction() {
 async function saveArticle(item) {
 	var link = item.link[0].replace('http://', 'https://')
 	try {
-		const article = await fetchContent(link)
+		let article = await fetchContent(link)
+    article = article.replace(/"/g, "'")
 		const encodedArticle = encodeURI(article)
 		const newArt = new Article({
 			publishDate: new Date(item.pubDate[0]).getTime(),
