@@ -25,14 +25,17 @@ async function init() {
 		setInterval(() => findForRevision(6, 'revision1'), config.revision1)
 		setInterval(() => findForRevision(48, 'revision2'), config.revision2)
 	} catch (error) {
-		console.log('while connecting to Mongo DB: ' + error)
+		log('while connecting to Mongo DB: ' + error)
 		return 1
 	}
 
-	console.log('System is now running...')
+log('System is now running...')
 }
 
-
+function log(message){
+	let date = new Date().toISOString()
+	console.log(date + " | " + message)
+}
 function getLatestArticle() {
 	return Article.findOne().select('publishDate').sort('-publishDate').limit(1).exec()
 }
@@ -43,7 +46,7 @@ async function mainFunction() {
 		const result = await parseXML(respond)
 		const lastArticle = await getLatestArticle()
 		const articleList = result.rss.channel[0].item
-		console.log('received XML List')
+		log('received XML List')
 		//  Check the case there is no last Article in DB
 		let lastArticleDate
 		if (!lastArticle) {
@@ -67,8 +70,11 @@ async function saveArticle(item) {
 	var link = item.link[0].replace('http://', 'https://')
 	try {
 		let article = await fetchContent(link)
-    article = article.replace(/"/g, "'")
-		const encodedArticle = encodeURI(article)
+		let cleanArticle = article.replace(/"/g,"\x27")
+		if (cleanArticle.includes("\x22")){
+			log("THERE ARE QUOTES in " + link)
+		}
+		const encodedArticle = encodeURI(cleanArticle)	
 		const newArt = new Article({
 			publishDate: new Date(item.pubDate[0]).getTime(),
 			title: item.title[0],
@@ -104,7 +110,7 @@ async function findForRevision(delay, wichRevision) {
 
 //  actually get the content and save it to DB
 async function doRevision(result) {
-	console.log('received ' + result.length + ' items to update')
+	log('received ' + result.length + ' items to update')
 	return new Promise((resolve, reject) => {
 		const newArticles = result.map(async (item) => {
 			const revisionArticle = await fetchContent(item.link)
@@ -113,7 +119,7 @@ async function doRevision(result) {
 			} else if (item.revision2 === 'nothing') {
 				item.revision2 = encodeURI(revisionArticle)
 			} else {
-				console.log('Error with this item: ' + JSON.stringify(item))
+				log('Error with this item: ' + JSON.stringify(item))
 				throw (new Error('revisions not empty'))
 			}
 			return item.save()
