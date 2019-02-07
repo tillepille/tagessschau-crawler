@@ -70,10 +70,7 @@ async function saveArticle(item) {
 	var link = item.link[0].replace('http://', 'https://')
 	try {
 		let article = await fetchContent(link)
-		let cleanArticle = article.replace(/"/g,"\x27")
-		if (cleanArticle.includes("\x22")){
-			log("THERE ARE QUOTES in " + link)
-		}
+		let cleanArticle = article.replace(/[\""]/g, '\\"')
 		const encodedArticle = encodeURI(cleanArticle)	
 		const newArt = new Article({
 			publishDate: new Date(item.pubDate[0]).getTime(),
