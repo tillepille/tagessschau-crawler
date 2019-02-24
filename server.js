@@ -70,8 +70,7 @@ async function saveArticle(item) {
 	var link = item.link[0].replace('http://', 'https://')
 	try {
 		let article = await fetchContent(link)
-		let cleanArticle = article.replace(/[\""]/g, '\\"')
-		const encodedArticle = encodeURI(cleanArticle)	
+		const encodedArticle = uriEscape(article)
 		const newArt = new Article({
 			publishDate: new Date(item.pubDate[0]).getTime(),
 			title: item.title[0],
@@ -112,9 +111,9 @@ async function doRevision(result) {
 		const newArticles = result.map(async (item) => {
 			const revisionArticle = await fetchContent(item.link)
 			if (item.revision1 === 'nothing') {
-				item.revision1 = encodeURI(revisionArticle)
+				item.revision1 = uriEscape(revisionArticle)
 			} else if (item.revision2 === 'nothing') {
-				item.revision2 = encodeURI(revisionArticle)
+				item.revision2 = uriEscape(revisionArticle)
 			} else {
 				log('Error with this item: ' + JSON.stringify(item))
 				throw (new Error('revisions not empty'))
@@ -124,6 +123,7 @@ async function doRevision(result) {
 		return Promise.all(newArticles)
 	})
 }
+
 //  Just a wrapper for http/https connections
 async function fetchContent(url) {
 	if (url.includes('https://')) {
@@ -134,6 +134,7 @@ async function fetchContent(url) {
 		return parseContent(res)
 	}
 }
+
 //  make the request
 function parseContent(res) {
 	return new Promise((resolve, reject) => {
@@ -173,4 +174,31 @@ function promiseHTTPS(url) {
 	})
 }
 
+function uriEscape(string) {
+  return string.split('').reduce((acc, elem) => {
+    let buf = new Buffer(elem)
+    if (buf.length === 1) {
+      // length 1 indicates that elem is not a unicode character.
+      // Check if it is an unreserved characer.
+      if ('A' <= elem && elem <= 'Z' ||
+          'a' <= elem && elem <= 'z' ||
+          '0' <= elem && elem <= '9' ||
+          elem === '_' ||
+          elem === '.' ||
+          elem === '~' ||
+          elem === '-')
+      {
+        // Unreserved characer should not be encoded.
+        acc = acc + elem
+        return acc
+      }
+    }
+    // elem needs encoding - i.e elem should be encoded if it's not unreserved
+    // character or if it's a unicode character.
+    for (var i = 0; i < buf.length; i++) {
+      acc = acc + "%" + buf[i].toString(16).toUpperCase()
+    }
+    return acc
+  }, '')
+}
 init()
