@@ -25,14 +25,17 @@ async function init() {
 		setInterval(() => findForRevision(6, 'revision1'), config.revision1)
 		setInterval(() => findForRevision(48, 'revision2'), config.revision2)
 	} catch (error) {
-		console.log('while connecting to Mongo DB: ' + error)
+		log('while connecting to Mongo DB: ' + error)
 		return 1
 	}
 
-	console.log('System is now running...')
+log('System is now running...')
 }
 
-
+function log(message){
+	let date = new Date().toISOString()
+	console.log(date + " | " + message)
+}
 function getLatestArticle() {
 	return Article.findOne().select('publishDate').sort('-publishDate').limit(1).exec()
 }
@@ -43,7 +46,7 @@ async function mainFunction() {
 		const result = await parseXML(respond)
 		const lastArticle = await getLatestArticle()
 		const articleList = result.rss.channel[0].item
-		console.log('received XML List')
+		log('received XML List')
 		//  Check the case there is no last Article in DB
 		let lastArticleDate
 		if (!lastArticle) {
@@ -67,8 +70,7 @@ async function saveArticle(item) {
 	var link = item.link[0].replace('http://', 'https://')
 	try {
 		let article = await fetchContent(link)
-    article = article.replace(/"/g, "'")
-		const encodedArticle = encodeURI(article)
+		const encodedArticle = uriEscape(article)
 		const newArt = new Article({
 			publishDate: new Date(item.pubDate[0]).getTime(),
 			title: item.title[0],
@@ -104,16 +106,16 @@ async function findForRevision(delay, wichRevision) {
 
 //  actually get the content and save it to DB
 async function doRevision(result) {
-	console.log('received ' + result.length + ' items to update')
+	log('received ' + result.length + ' items to update')
 	return new Promise((resolve, reject) => {
 		const newArticles = result.map(async (item) => {
 			const revisionArticle = await fetchContent(item.link)
 			if (item.revision1 === 'nothing') {
-				item.revision1 = encodeURI(revisionArticle)
+				item.revision1 = uriEscape(revisionArticle)
 			} else if (item.revision2 === 'nothing') {
-				item.revision2 = encodeURI(revisionArticle)
+				item.revision2 = uriEscape(revisionArticle)
 			} else {
-				console.log('Error with this item: ' + JSON.stringify(item))
+				log('Error with this item: ' + JSON.stringify(item))
 				throw (new Error('revisions not empty'))
 			}
 			return item.save()
@@ -121,6 +123,7 @@ async function doRevision(result) {
 		return Promise.all(newArticles)
 	})
 }
+
 //  Just a wrapper for http/https connections
 async function fetchContent(url) {
 	if (url.includes('https://')) {
@@ -131,6 +134,7 @@ async function fetchContent(url) {
 		return parseContent(res)
 	}
 }
+
 //  make the request
 function parseContent(res) {
 	return new Promise((resolve, reject) => {
@@ -170,4 +174,31 @@ function promiseHTTPS(url) {
 	})
 }
 
+function uriEscape(string) {
+  return string.split('').reduce((acc, elem) => {
+    let buf = new Buffer(elem)
+    if (buf.length === 1) {
+      // length 1 indicates that elem is not a unicode character.
+      // Check if it is an unreserved characer.
+      if ('A' <= elem && elem <= 'Z' ||
+          'a' <= elem && elem <= 'z' ||
+          '0' <= elem && elem <= '9' ||
+          elem === '_' ||
+          elem === '.' ||
+          elem === '~' ||
+          elem === '-')
+      {
+        // Unreserved characer should not be encoded.
+        acc = acc + elem
+        return acc
+      }
+    }
+    // elem needs encoding - i.e elem should be encoded if it's not unreserved
+    // character or if it's a unicode character.
+    for (var i = 0; i < buf.length; i++) {
+      acc = acc + "%" + buf[i].toString(16).toUpperCase()
+    }
+    return acc
+  }, '')
+}
 init()
